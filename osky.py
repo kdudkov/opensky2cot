@@ -5,16 +5,12 @@ import sys
 import time
 import socket
 import xml.etree.ElementTree as ET
+import argparse
 
 latmin, lonmin = 59.277491, 29.066558
 latmax, lonmax = 60.293171, 32.255798
 
 TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
-
-ATAK_HOST = '192.168.0.2'
-ATAK_PORT = 8089
-
-UDP_PORT = 4242
 
 def state2cot(s):
     cot = ET.Element('event')
@@ -45,20 +41,20 @@ def state2cot(s):
 
     return ET.tostring(cot)
 
-def send_broadcast(data):
+def send_broadcast(addr, port, data):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    s.sendto(data, (B_ADDR, B_PORT))
+    s.sendto(data, (addr, port))
     s.close()
 
-def send_udp(data):
+def send_udp(addr, port, data):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.sendto(data, (ATAK_HOST, UDP_PORT))
+    s.sendto(data, (addr, port))
     s.close()
 
-def send_tcp(data):
+def send_tcp(addr, port,data):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((ATAK_HOST, ATAK_PORT))
+    s.connect((addr, port))
     s.send(data)
     s.close()
 
@@ -82,15 +78,44 @@ def send_tcp(data):
 16 	position_source 	int 	Origin of this state’s position: 0 = ADS-B, 1 = ASTERIX, 2 = MLAT
 """
 
-r = requests.get('https://opensky-network.org/api/states/all?lamin=%f&lomin=%f&lamax=%f&lomax=%f' % (latmin, lonmin, latmax, lonmax))
+def get_info():
+    url = 'https://opensky-network.org/api/states/all?lamin=%f&lomin=%f&lamax=%f&lomax=%f' % (latmin, lonmin, latmax, lonmax)
+    r = requests.get(url)
 
-if r.status_code != requests.codes.ok:
-    print('invalid responce - %d: %s' % (r.status_code, r.text))
-    sys.exit(1)
+    if r.status_code != requests.codes.ok:
+        print('invalid responce - %d: %s' % (r.status_code, r.text))
+        sys.exit(1)
 
-states = r.json()['states']
+    return r.json()['states']
 
-print('got %d planes' % len(states))
-for s in states:
-    dat = state2cot(s)
-    send_udp(dat)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--proto", help="protocol to send: tcp, udp or broadcast", default="broadcast")
+    parser.add_argument("--addr", help="address")
+    parser.add_argument("--port", help="port", type=int, default=0)
+    parser.add_argument("--debug", help="debug output", action="store_true")
+    args = parser.parse_args()
+
+    states = get_info()
+
+    print('got %d planes' % len(states))
+    for s in states:
+        dat = state2cot(s)
+        if args.debug:
+            print(str(dat))
+
+        if args.proto.lower() == 'udp':
+            addr = args.addr or '127.0.0.1'
+            port = args.port or 4242
+            print('sending via udp to %s:%d' % (addr, port))
+            send_udp(addr, port, dat)
+        elif args.proto.lower() == 'tcp':
+            addr = args.addr or '127.0.0.1'
+            port = args.port or 8099
+            print('sending via tcp to %s:%d' % (addr, port))
+            send_tcp(addr, port, dat)
+        elif args.proto.lower() == 'broadcast':
+            addr = args.addr or '239.2.3.1'
+            port = args.port or 6969
+            print('sending via broadcast to %s:%d' % (addr, port))
+            send_broadcast(addr, port, dat)
