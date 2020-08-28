@@ -7,9 +7,6 @@ import socket
 import xml.etree.ElementTree as ET
 import argparse
 
-latmin, lonmin = 59.277491, 29.066558
-latmax, lonmax = 60.293171, 32.255798
-
 TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 
 def state2cot(s):
@@ -78,7 +75,7 @@ def send_tcp(addr, port,data):
 16 	position_source 	int 	Origin of this state’s position: 0 = ADS-B, 1 = ASTERIX, 2 = MLAT
 """
 
-def get_info():
+def get_info(latmin, lonmin, latmax, lonmax):
     url = 'https://opensky-network.org/api/states/all?lamin=%f&lomin=%f&lamax=%f&lomax=%f' % (latmin, lonmin, latmax, lonmax)
     r = requests.get(url)
 
@@ -93,29 +90,37 @@ if __name__ == '__main__':
     parser.add_argument("--proto", help="protocol to send: tcp, udp or broadcast", default="broadcast")
     parser.add_argument("--addr", help="address")
     parser.add_argument("--port", help="port", type=int, default=0)
+    parser.add_argument("--latmin", help="min latitude", type=float, default=59.3)
+    parser.add_argument("--lonmin", help="min longutude", type=float, default=29.0)
+    parser.add_argument("--latmax", help="max latitude", type=float, default=60.3)
+    parser.add_argument("--lonmax", help="max longutude", type=float, default=32.2)
     parser.add_argument("--debug", help="debug output", action="store_true")
     args = parser.parse_args()
 
-    states = get_info()
+    states = get_info(args.latmin, args.lonmin, args.latmax, args.lonmax)
 
     print('got %d planes' % len(states))
+    sender = None
+    if args.proto.lower() == 'udp':
+        addr = args.addr or '127.0.0.1'
+        port = args.port or 4242
+        print('sending via udp to %s:%d' % (addr, port))
+        sender = send_udp
+    elif args.proto.lower() == 'tcp':
+        addr = args.addr or '127.0.0.1'
+        port = args.port or 8099
+        print('sending via tcp to %s:%d' % (addr, port))
+        sender = send_tcp
+    elif args.proto.lower() == 'broadcast':
+        addr = args.addr or '239.2.3.1'
+        port = args.port or 6969
+        print('sending via broadcast to %s:%d' % (addr, port))
+        sender = send_broadcast
+
     for s in states:
         dat = state2cot(s)
         if args.debug:
             print(str(dat))
 
-        if args.proto.lower() == 'udp':
-            addr = args.addr or '127.0.0.1'
-            port = args.port or 4242
-            print('sending via udp to %s:%d' % (addr, port))
-            send_udp(addr, port, dat)
-        elif args.proto.lower() == 'tcp':
-            addr = args.addr or '127.0.0.1'
-            port = args.port or 8099
-            print('sending via tcp to %s:%d' % (addr, port))
-            send_tcp(addr, port, dat)
-        elif args.proto.lower() == 'broadcast':
-            addr = args.addr or '239.2.3.1'
-            port = args.port or 6969
-            print('sending via broadcast to %s:%d' % (addr, port))
-            send_broadcast(addr, port, dat)
+        if sender is not None:
+            sender(addr, port, dat)
