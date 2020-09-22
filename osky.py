@@ -13,10 +13,7 @@ def state2cot(s):
     cot = ET.Element('event')
     cot.set('version', '2.0')
     cot.set('uid', 'icao24-' + s[0].lower())
-    if s[8]:
-        cot.set('type', 'a-f-G-C-F')
-    else:
-        cot.set('type', 'a-f-A-C-F')
+    cot.set('type', 'a-n-A-C-F')
     cot.set('how', 'm-g')
     cot.set('time', time.strftime(TIME_FORMAT, time.gmtime()))
     cot.set('start', time.strftime(TIME_FORMAT, time.gmtime()))
@@ -90,20 +87,24 @@ if __name__ == '__main__':
     parser.add_argument("--proto", help="protocol to send: tcp, udp or broadcast", default="broadcast")
     parser.add_argument("--addr", help="address")
     parser.add_argument("--port", help="port", type=int, default=0)
-    parser.add_argument("--latmin", help="min latitude", type=float, default=59.3)
-    parser.add_argument("--lonmin", help="min longutude", type=float, default=29.0)
-    parser.add_argument("--latmax", help="max latitude", type=float, default=60.3)
-    parser.add_argument("--lonmax", help="max longutude", type=float, default=32.2)
+    parser.add_argument("--latmin", help="min latitude", type=float, default=55.0)
+    parser.add_argument("--lonmin", help="min longutude", type=float, default=20.0)
+    parser.add_argument("--latmax", help="max latitude", type=float, default=65.0)
+    parser.add_argument("--lonmax", help="max longutude", type=float, default=40.0)
     parser.add_argument("--debug", help="debug output", action="store_true")
     args = parser.parse_args()
 
     states = get_info(args.latmin, args.lonmin, args.latmax, args.lonmax)
 
-    print('got %d planes' % len(states))
+    if states is None:
+        print('Got no aircrafts')
+        sys.exit(1)
+
+    print('got %d aircraft' % len(states))
     sender = None
     if args.proto.lower() == 'udp':
         addr = args.addr or '127.0.0.1'
-        port = args.port or 4242
+        port = args.port or 8999
         print('sending via udp to %s:%d' % (addr, port))
         sender = send_udp
     elif args.proto.lower() == 'tcp':
