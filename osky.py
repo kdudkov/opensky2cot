@@ -82,18 +82,7 @@ def get_info(latmin, lonmin, latmax, lonmax):
 
     return r.json()['states']
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--proto", help="protocol to send: tcp, udp or broadcast", default="broadcast")
-    parser.add_argument("--addr", help="address")
-    parser.add_argument("--port", help="port", type=int, default=0)
-    parser.add_argument("--latmin", help="min latitude", type=float, default=55.0)
-    parser.add_argument("--lonmin", help="min longutude", type=float, default=20.0)
-    parser.add_argument("--latmax", help="max latitude", type=float, default=65.0)
-    parser.add_argument("--lonmax", help="max longutude", type=float, default=40.0)
-    parser.add_argument("--debug", help="debug output", action="store_true")
-    args = parser.parse_args()
-
+def send_data(args):
     states = get_info(args.latmin, args.lonmin, args.latmax, args.lonmax)
 
     if states is None:
@@ -125,3 +114,23 @@ if __name__ == '__main__':
 
         if sender is not None:
             sender(addr, port, dat)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--proto", help="protocol to send: tcp, udp or broadcast", default="broadcast")
+    parser.add_argument("--addr", help="address")
+    parser.add_argument("--port", help="port", type=int, default=0)
+    parser.add_argument("--latmin", help="min latitude", type=float, default=55.0)
+    parser.add_argument("--lonmin", help="min longutude", type=float, default=20.0)
+    parser.add_argument("--latmax", help="max latitude", type=float, default=65.0)
+    parser.add_argument("--lonmax", help="max longutude", type=float, default=40.0)
+    parser.add_argument("--debug", help="debug output", action="store_true")
+    parser.add_argument("-t", "--timeout", help="timeout to send, seconds", type=int, default=0)
+    args = parser.parse_args()
+
+    while True:
+        send_data(args)
+        if args.timeout == 0:
+            break
+        time.sleep(args.timeout)
+
