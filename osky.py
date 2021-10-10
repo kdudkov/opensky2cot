@@ -129,7 +129,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     while True:
-        send_data(args)
+        try:
+            send_data(args)
+        except Exception as e:
+            print(f'error: ${e}')
         if args.timeout == 0:
             break
         time.sleep(args.timeout)
